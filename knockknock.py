@@ -75,11 +75,8 @@ def knocknock():
 			# ->one for each startup item type
 			for result in results:
 
-				#list of files to be ignored
-				ignoredFiles = []
-
-				#list of commands to be ignored
-				ignoredCommands = []
+				#ignored/whitelisted items
+				ignoredItems = []
 
 				#scan each startup object
 				# ->if it should be ingored, add to ignore list
@@ -92,29 +89,18 @@ def knocknock():
 						#by default, ignore signed by Apple
 						if not args.apple and startupObj.signedByApple():
 
-							#save
-							ignoredFiles.append(startupObj)
+							#add to list
+							ignoredItems.append(startupObj)
 
-						#by default, ignore whitelisted binaries
-						# ->ignore if already saved though
-						elif not args.whitelist and startupObj.isWhitelisted:
+					#ignore white listed items
+					if not args.whitelist and startupObj.isWhitelisted:
 
-							#save
-							ignoredFiles.append(startupObj)
-
-					#filter out commands
-					# ->just whitelisted ones
-					if isinstance(startupObj, command.Command):
-
-						#by default, ignore whitelisted commands
-						if not args.whitelist and startupObj.isWhitelisted:
-
-							#save
-							ignoredCommands.append(startupObj)
+							#add to list
+							ignoredItems.append(startupObj)
 
 					#now that we are done iterating
-					# ->subtract out all ignored files and command
-					result['items'] =  list(set(result['items']) - set(ignoredFiles) - set(ignoredCommands))
+					# ->subtract out all ignored/whitelisted items
+					result['items'] =  list(set(result['items']) - set(ignoredItems))
 
 		#format output
 		# ->normal output or JSON

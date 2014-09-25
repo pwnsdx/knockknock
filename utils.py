@@ -244,7 +244,8 @@ def getBinaryFromBundle(bundlePath):
 	return binaryPath
 
 
-#given a list of path, expand any '~'s into all users
+#given a list of paths, expand any '~'s into all users
+# ->returned paths are checked here to ensure they exist
 def expandPaths(paths):
 
 	#expanded paths
@@ -257,19 +258,23 @@ def expandPaths(paths):
 		if '~' in path:
 
 			#expand path and insert list
-			expandedPaths.extend(expand(path))
+			# ->expanded paths are checked inside function to ensure that they exist
+			expandedPaths.extend(expandPath(path))
 
 		#no expansion necessary
 		else:
 
-			#just add
-			expandedPaths.append(path)
+			#make sure file exist
+			if os.path.exists(path):
+
+				#add
+				expandedPaths.append(path)
 
 	return expandedPaths
 
 
 #given a a path, expand '~' into all users
-def expand(path):
+def expandPath(path):
 
 	#expanded paths
 	expandedPaths = []
@@ -879,6 +884,5 @@ def md5sum(filename):
 		digest = None
 
 	return digest
-
 
 

@@ -52,7 +52,7 @@ class scan(IPlugin):
 
 		#process
 		# ->open file and read each line
-		for userLoginItems in utils.expand(LOGIN_ITEM_FILE):
+		for userLoginItems in utils.expandPath(LOGIN_ITEM_FILE):
 
 			#wrap
 			try:

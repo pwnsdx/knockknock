@@ -1,0 +1,8 @@
+[Core]
+Name = Browser extension scanner
+Module = browserExtension
+
+[Documentation]
+Author = Patrick W, et. al
+Version = 1.0
+Description = Plugin that scans for installed browser extensions
