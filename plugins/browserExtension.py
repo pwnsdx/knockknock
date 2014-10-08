@@ -287,20 +287,22 @@ class scan(IPlugin):
 
 					#extract manifest
 					# ->contains name, description, etc
-					manifest = currentExtension['manifest']
-					if manifest:
+					if 'manifest' in currentExtension:
 
-						#extract name
-						if 'name' in manifest:
+						manifest = currentExtension['manifest']
+						if manifest:
 
-							#name
-							extensionInfo['name'] = manifest['name']
+							#extract name
+							if 'name' in manifest:
 
-						#extract description
-						if 'description' in manifest:
+								#name
+								extensionInfo['name'] = manifest['name']
 
-							#description
-							extensionInfo['description'] = manifest['description']
+							#extract description
+							if 'description' in manifest:
+
+								#description
+								extensionInfo['description'] = manifest['description']
 
 					#extract path
 					if 'path' in currentExtension:
