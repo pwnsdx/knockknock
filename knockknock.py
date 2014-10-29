@@ -1,4 +1,7 @@
-'KnockKnock by Patrick Wardle is licensed under a Creative Commons Attribution-NonCommercial 4.0 International License.'
+#!/usr/bin/python
+#
+# KnockKnock by Patrick Wardle is licensed under a Creative Commons Attribution-NonCommercial 4.0 International License.
+#
 
 import os
 import sys
