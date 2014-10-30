@@ -72,11 +72,19 @@ class scan(IPlugin):
 		#init results
 		results = self.initResults(INSERTED_DYNAMIC_LIBRARIES_NAME, INSERTED_DYNAMIC_LIBRARIES_DESCRIPTION)
 
-		#scan launch items inserted dylibs
-		results['items'].extend(scanLaunchItems(LAUNCH_ITEMS_DIRECTORIES))
+		#scan launch items for inserted dylibs
+		launchItems = scanLaunchItems(LAUNCH_ITEMS_DIRECTORIES)
+		if launchItems:
 
-		#scan all installed applications
-		results['items'].extend(scanApplications())
+			#save
+			results['items'].extend(launchItems)
+
+		#scan all installed applications for inserted dylibs
+		applications = scanApplications()
+		if applications:
+
+			#save
+			results['items'].extend(applications)
 
 		return results
 
@@ -112,10 +120,17 @@ def scanApplications():
 	appPlists = []
 
 	#dbg msg
-	utils.logMessage(utils.MODE_INFO, 'generating list of all installed apps')
+	utils.logMessage(utils.MODE_INFO, 'generating list of all installed apps (this may take some time)')
 
 	#get all installed apps
 	installedApps = utils.getInstalledApps()
+
+	#sanity check
+	# ->using system_profiler (to get installed apps) can timeout/throw exception, etc
+	if not installedApps:
+
+		#bail
+		return None
 
 	#now, get Info.plist for each app
 	for app in installedApps:
@@ -150,8 +165,14 @@ def scanPlists(plists, key, isLoaded=False):
 	#results
 	results = []
 
+	#sanity check
+	if not plists:
+
+		#bail
+		return None
+
 	#iterate over all plist
-	# ->check 'RunAtLoad' (for true) and then extract the first item in the 'ProgramArguments'
+	# ->check for 'DYLD_INSERT_LIBRARIES' enviroment variable
 	for plist in plists:
 
 		#wrap
@@ -170,7 +191,7 @@ def scanPlists(plists, key, isLoaded=False):
 					#skip
 					continue
 
-			#otherwise its already loaded
+			#otherwise it's already loaded
 			# ->use as is
 			else:
 

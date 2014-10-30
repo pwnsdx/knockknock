@@ -53,6 +53,9 @@ SecCSSignatureOK = errSecSuccess
 # ->see CSCommon.h
 errSecCSUnsigned = -67062
 
+#from (carbon) MacErrors.h
+kPOSIXErrorEACCES = 100013
+
 #from OS X
 kSecCSSigningInformation = 0x2
 
@@ -458,8 +461,20 @@ def checkSignature(file, bundle=None):
 	result = securityFramework.SecStaticCodeCreateWithPath(ctypes.c_void_p(objc.pyobjc_id(path)), kSecCSDefaultFlags, ctypes.byref(staticCode))
 	if errSecSuccess != result:
 
-		#error
-		logMessage(MODE_ERROR, 'SecStaticCodeCreateWithPath(\'%s\') failed with %d' % (path, result))
+		#log mode
+		# ->might be error or info depending on result/priv level
+		logMode = MODE_ERROR
+
+		#when user isn't r00t and error is accessed denied
+		# ->treat error as just an info warning (addresses issue of '/usr/sbin/cupsd')
+		if (0 != os.geteuid()) and (result == kPOSIXErrorEACCES):
+
+			#just warn (supressed in non-verbose mode)
+			logMode = MODE_INFO
+
+		#dbg msg
+		# ->note: uses log mode
+		logMessage(logMode, 'SecStaticCodeCreateWithPath(\'%s\') failed with %d' % (path, result))
 
 		#bail
 		return (status, None, None)
@@ -548,8 +563,6 @@ def checkSignature(file, bundle=None):
 	#make sure binary is signed
 	# ->then, extract signing authorities
 	if errSecSuccess == signedStatus:
-
-		#print 'File is signed!'
 
 		#pointer for info dictionary
 		information = ctypes.c_void_p(0)
@@ -781,12 +794,16 @@ def getInstalledApps():
 	#list of apps
 	installedApps = None
 
+	#command-line for system_profiler
+	# ->xml, mini, timeout etc.
+	commandLine = ['system_profiler', 'SPApplicationsDataType', '-xml',  '-detailLevel', 'mini', '-timeout', '30']
+
 	#wrap
 	try:
 
 		#get info about all installed apps via 'system_profiler'
 		# ->(string)output is read in as plist
-		systemProfileInfo = plistlib.readPlistFromString(subprocess.check_output(['system_profiler', 'SPApplicationsDataType', '-xml']))
+		systemProfileInfo = plistlib.readPlistFromString(subprocess.check_output(commandLine))
 
 		#get all installed apps
 		# ->under '_items' key
@@ -803,46 +820,6 @@ def getInstalledApps():
 		#traceback.print_exc()
 
 	return installedApps
-
-
-
-
-#recursively find files
-# from: http://stackoverflow.com/questions/2186525/use-a-glob-to-find-files-recursively-in-python
-'''
-def findFiles(startDirectory, pattern, depth):
-
-	#initial depth of starting dir
-	# simply count '/'
-	initialDepth = startDirectory.count(os.path.sep)
-
-	#list of all files
-	files = []
-
-	#list of files
-	matchedFiles = []
-
-	#get all files under directory
-	for root, dirnames, filenames in os.walk(startDirectory, topdown=True):
-
-		print 'ROOT: ' + root
-		if root.count(os.path.sep) - initialDepth == depth:
-
-			#files += [os.path.join(root, d) for d in dirnames]
-			dirnames[:] = []
-
-		print 'DIRS: %s' % dirnames
-		print filenames
-		#get all files that match
-		for filename in fnmatch.filter(filenames, pattern):
-
-			#save em
-			matchedFiles.append(os.path.join(root, filename))
-
-	#print matchedFiles
-
-	return matchedFiles
-'''
 
 #hash (MD5) a file
 # from: http://stackoverflow.com/questions/7829499/using-hashlib-to-compute-md5-digest-of-a-file-in-python-3
