@@ -136,6 +136,19 @@ def initKK():
 	#global import
 	global PluginManager
 
+	#get python version
+	pythonVersion = sys.version_info
+
+	#check that python is at least 2.7
+	if sys.version_info[0] == 2 and sys.version_info[1] < 7:
+
+		#err msg
+		# ->as logging isn't init'd yet, just print directly
+		print('ERROR: KnockKnock requires python 2.7+ (found: %s)' % (pythonVersion))
+
+		#bail
+		return False
+
 	#add knock knock's lib path to system path
 	# ->ensures 3rd-party libs will be imported OK
 	sys.path.insert(0, os.path.join(utils.getKKDirectory(), 'libs'))
@@ -157,21 +170,18 @@ def initKK():
 	#dbg msg
 	utils.logMessage(utils.MODE_INFO, 'initialized logging')
 
-	#check version
-	# ->only support Mavericks for now
+	#check version (Mavericks/Yosemite for now)
+	# ->this isn't a fatal error for now, so just log a warning for unsupported versions
 	if not utils.isSupportedOS():
 
 		#dbg msg
-		utils.logMessage(utils.MODE_INFO, '%.1f is not a fully supported OS X version' % (utils.getOSVersion()))
-
-		#bail
-		#return False
+		utils.logMessage(utils.MODE_WARN, '%s is not an officially supported OS X version (you milage may vary)' % ('.'.join(utils.getOSVersion())))
 
 	#dbg msg
 	else:
 
 		#dbg msg
-		utils.logMessage(utils.MODE_INFO, '%.1f is a supported OS X version' % (utils.getOSVersion()))
+		utils.logMessage(utils.MODE_INFO, '%s is a supported OS X version' % ('.'.join(utils.getOSVersion())))
 
 	#load python <-> Objc bindings
 	# ->might fail if non-Apple version of python is being used

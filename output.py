@@ -3,6 +3,7 @@ import json
 #project imports
 import file
 import command
+import extension
 
 #json encoder
 class jsonEncoder(json.JSONEncoder):
@@ -13,7 +14,7 @@ class jsonEncoder(json.JSONEncoder):
 
 		#for file and command objects
 		# ->return the objects dictionary
-		if isinstance(obj, file.File) or isinstance(obj, command.Command):
+		if isinstance(obj, file.File) or isinstance(obj, command.Command) or isinstance(obj, extension.Extension):
 
 			#object dictionary
 			return obj.__dict__

@@ -12,17 +12,25 @@ import traceback
 import subprocess
 import ctypes.util
 
-#min supported OS X version
-MIN_OS_VERSION = 10.9
+#support OS X version (major)
+SUPPORTED_OS_VERSION = 10
 
-#max supported OS X version
-MAX_OS_VERSION = 10.9
+#min supported OS X version (minor)
+# ->10.9
+MIN_OS_VERSION_MINOR = 9
+
+#max supported OS X version (minor)
+# ->10.10
+MAX_OS_VERSION_MINOR = 10
 
 #global verbose/logging flag
 verbose = False
 
 #logging mode; info
 MODE_INFO = 'INFO'
+
+#logging mode; warning
+MODE_WARN = 'WARNING'
 
 #logging mode; error
 MODE_ERROR = 'ERROR'
@@ -122,20 +130,20 @@ def initLogging(verbosity):
 	return True
 
 #display msgs
-def logMessage(mode, msg):
+def logMessage(mode, msg, shouldSupress=None):
 
-	#always display errors
-	if MODE_ERROR == mode:
+	#always display warnings and errors
+	if (MODE_WARN == mode or MODE_ERROR == mode) and not shouldSupress:
 
 		#display it
-		print '%s: %s' % (mode, msg)
+		print('%s: %s' % (mode, msg))
 
 	#in verbose mode
-	# ->display error
+	# ->always display everything
 	elif verbose:
 
 		#display it
-		print '%s: %s' % (mode, msg)
+		print('%s: %s' % (mode, msg))
 
 	return
 
@@ -148,25 +156,33 @@ def isSupportedOS():
 	#get OS version
 	version = getOSVersion()
 
-	#make sure version is inbetween min and max
-	if MIN_OS_VERSION <= version <= MAX_OS_VERSION:
+	#extract major
+	versionMajor = int(version[0])
 
-		#supported
-		supportedOS = True
+	#extract minor
+	versionMinor = int(version[1])
+
+	#first check major version
+	# ->just OS X (10)
+	if SUPPORTED_OS_VERSION == versionMajor:
+
+		#make sure minor version is in between min and max
+		# ->OS 10.9 thru 10.10
+		if MIN_OS_VERSION_MINOR <= versionMinor <= MAX_OS_VERSION_MINOR:
+
+			#supported
+			supportedOS = True
 
 	return supportedOS
 
 #get OS X version
-# ->returns is as a float (e.g. 10.9f)
+# ->returns is an list, major, minor, etc
 def getOSVersion():
 
 	#get version (as string)
 	version, _, _ = platform.mac_ver()
 
-	#return OS version as float
-	# ->e.g. 10.9
-	return float('.'.join(version.split('.')[:2]))
-
+	return version.split('.')
 
 #get the base directory of KnockKnock
 def getKKDirectory():
@@ -461,20 +477,21 @@ def checkSignature(file, bundle=None):
 	result = securityFramework.SecStaticCodeCreateWithPath(ctypes.c_void_p(objc.pyobjc_id(path)), kSecCSDefaultFlags, ctypes.byref(staticCode))
 	if errSecSuccess != result:
 
-		#log mode
-		# ->might be error or info depending on result/priv level
-		logMode = MODE_ERROR
+		#supress flag
+		# ->for for non-r00t users want to supresss this error
+		shouldSupress = False
 
 		#when user isn't r00t and error is accessed denied
 		# ->treat error as just an info warning (addresses issue of '/usr/sbin/cupsd')
 		if (0 != os.geteuid()) and (result == kPOSIXErrorEACCES):
 
-			#just warn (supressed in non-verbose mode)
-			logMode = MODE_INFO
+			#supress in non-verbose mode
+			# ->overrides default behavior of MODE_WARN
+			shouldSupress = True
 
 		#dbg msg
 		# ->note: uses log mode
-		logMessage(logMode, 'SecStaticCodeCreateWithPath(\'%s\') failed with %d' % (path, result))
+		logMessage(MODE_ERROR, 'SecStaticCodeCreateWithPath(\'%s\') failed with %d' % (path, result), shouldSupress)
 
 		#bail
 		return (status, None, None)
@@ -795,8 +812,14 @@ def getInstalledApps():
 	installedApps = None
 
 	#command-line for system_profiler
-	# ->xml, mini, timeout etc.
-	commandLine = ['system_profiler', 'SPApplicationsDataType', '-xml',  '-detailLevel', 'mini', '-timeout', '30']
+	# ->xml, mini, etc.
+	commandLine = ['system_profiler', 'SPApplicationsDataType', '-xml',  '-detailLevel', 'mini', ]
+
+	#on newer OS's (10.9+) system_profiler supports a timeout
+	if int(getOSVersion()[1]) >= 9:
+
+		#add timeout
+		commandLine.extend(['-timeout', '60'])
 
 	#wrap
 	try:
@@ -814,10 +837,6 @@ def getInstalledApps():
 
 		#reset
 		installedApps = None
-
-		#err msg
-		#logMessage(MODE_ERROR, '\n EXCEPTION, %s() threw: %s' % (sys._getframe().f_code.co_name, e))
-		#traceback.print_exc()
 
 	return installedApps
 

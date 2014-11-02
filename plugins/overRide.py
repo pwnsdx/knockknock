@@ -80,56 +80,86 @@ class scan(IPlugin):
 				if '_com.apple.SMLoginItemBookmarks' in plistData:
 
 					#extract all
+					# ->'_com.apple.SMLoginItemBookmarks' is key
 					sandboxedLoginItemsBookmarks = plistData['_com.apple.SMLoginItemBookmarks']
 
 					#iterate over all
 					# ->extract from bookmark blob
 					for sandboxedLoginItem in sandboxedLoginItemsBookmarks:
 
-						#ignore disabled ones
-						if not self.isOverrideEnabled(plistData, sandboxedLoginItem):
+						#wrap
+						# ->here, allows just single item to be skipped
+						try:
+
+							#ignore disabled ones
+							if not self.isOverrideEnabled(plistData, sandboxedLoginItem):
+
+								#skip
+								continue
+
+							#parse bookmark blob
+							# ->attempt to extract login item
+							loginItem = self.parseBookmark(sandboxedLoginItemsBookmarks[sandboxedLoginItem])
+
+							#ignore files that don't exist
+							# ->some apps that don't cleanly uninstall leave entries here
+							if not os.path.exists(loginItem):
+
+								#skip
+								continue
+
+							#save extracted login item
+							if loginItem:
+
+								#save
+								results['items'].append(file.File(loginItem))
+
+						#ignore exceptions
+						# ->just try next time
+						except:
 
 							#skip
 							continue
 
-						#parse bookmark blob
-						# ->attempt to extract login item
-						loginItem = self.parseBookmark(sandboxedLoginItemsBookmarks[sandboxedLoginItem])
-
-						#save extracted login item
-						if loginItem:
-
-							#save
-							results['items'].append(file.File(loginItem))
-
 				#now parse 'normal' overrides
 				for overrideItem in plistData:
 
-					#skip the overrides that are also in the bookmark dictionary
-					# ->these were already processed (above)
-					if sandboxedLoginItemsBookmarks and overrideItem in sandboxedLoginItemsBookmarks:
+					#wrap
+					# ->here, allows just single item to be skipped
+					try:
+
+						#skip the overrides that are also in the bookmark dictionary
+						# ->these were already processed (above)
+						if sandboxedLoginItemsBookmarks and overrideItem in sandboxedLoginItemsBookmarks:
+
+							#skip
+							continue
+
+						#ignore disabled ones
+						if not self.isOverrideEnabled(plistData, overrideItem):
+
+							#skip
+							continue
+
+						#here, just got a bundle ID
+						# ->try to get the binary for it by searching launch daemon and agents
+						binaryForOveride = self.findBinaryForOveride(overrideItem)
+
+						#save binaries
+						if binaryForOveride:
+
+							#save
+							results['items'].append(file.File(binaryForOveride))
+
+					#ignore exceptions
+					# ->just try next time
+					except:
 
 						#skip
 						continue
-
-					#ignore disabled ones
-					if not self.isOverrideEnabled(plistData, overrideItem):
-
-						#skip
-						continue
-
-					#here, just got a bundle ID
-					# ->try to get the binary for it by searching launch daemon and agents
-					binaryForOveride = self.findBinaryForOveride(overrideItem)
-
-					#save binaries
-					if binaryForOveride:
-
-						#save
-						results['items'].append(file.File(binaryForOveride))
 
 			#ignore exceptions
-			except:
+			except Exception, e:
 
 				#skip
 				continue
