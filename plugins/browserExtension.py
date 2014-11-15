@@ -218,6 +218,7 @@ class scan(IPlugin):
 			#ignore exceptions
 			except Exception, e:
 
+				#leave in err msg (for now)
 				print e
 				traceback.print_exc()
 
@@ -259,7 +260,6 @@ class scan(IPlugin):
 
 				#scan all extensions
 				# ->skip ones that are disabled, white listed, etc
-				# TODO: skip ones that don't exist (path)
 				for extensionKey in extensions:
 
 					#dictionary for extension info
@@ -307,8 +307,25 @@ class scan(IPlugin):
 					#extract path
 					if 'path' in currentExtension:
 
-						#create full path
-						extensionInfo['path'] = os.path.dirname(chromePreferenceFile) + '/Extensions/' + currentExtension['path']
+						#sometimes path is (already) full path
+						# e.g. /Applications/Google Chrome.app/.../Google Chrome Framework.framework/Resources/<blah>
+						if os.path.exists(currentExtension['path']):
+
+							#save
+							extensionInfo['path'] = currentExtension['path']
+
+						#generally though the full path has to be built
+						else:
+
+							#build full path
+							extensionInfo['path'] = os.path.dirname(chromePreferenceFile) + '/Extensions/' + currentExtension['path']
+
+						#ignore path's that don't exist
+						# ->uninstallers may not clean up things correctly
+						if not os.path.exists(extensionInfo['path']):
+
+							#skip
+							continue
 
 					#create and append
 					results.append(extension.Extension(extensionInfo))
@@ -316,9 +333,9 @@ class scan(IPlugin):
 			#ignore exceptions
 			except Exception, e:
 
+				#leave in err msg (for now)
 				print e
 				traceback.print_exc()
-
 
 				#skip/try next
 				continue
@@ -326,23 +343,30 @@ class scan(IPlugin):
 		return results
 
 
-	#scan for firefox extensions ('addons' in Mozilla parlance)
-	# ->open/parse all 'addons.json' files
+	#scan for firefox extensions
+	# ->open/parse all 'addons.json' and 'extension.json' files
 	def scanExtensionsFirefox(self):
 
 		#results
 		results = []
 
+		#dictionary of extension IDs
+		# ->needed since they can show up in both addons.json and extensions.json
+		extensionIDs = []
+
 		#get list of all firefox's profile directories
-		# ->these contain profiles, that in turn, contain a file ('addons.json') about the extensions
+		# ->these contain profiles, that in turn, contain a files ('addons.json/extensions.json') about the extensions
 		firefoxProfileDirectories = utils.expandPath(FIREFOX_PROFILE_DIRECTORY)
 
-		#iterate over all extension profile directories
-		# ->get list of 'addons.json' files
+		#iterate over all addons and extensions files in profile directories
+		# ->extact all addons and extensions
 		for firefoxProfileDirectory in firefoxProfileDirectories:
 
-			#get list of all 'addon.json'files
-			firefoxExtensionFiles = glob.glob(firefoxProfileDirectory + '/*.default/addons.json')
+			#get list of all 'addon.json' files
+			firefoxExtensionFiles = glob.glob(firefoxProfileDirectory + '/*.default*/addons.json')
+
+			#and also all 'extensions.json' files
+			firefoxExtensionFiles.extend(glob.glob(firefoxProfileDirectory + '/*.default*/extensions.json'))
 
 			#open/parse each addon file
 			# ->contains list of addons (extensions)
@@ -367,10 +391,11 @@ class scan(IPlugin):
 					#skip/try next
 					continue
 
-				#extract all addons
+				#extract all addons/extensions
+				# ->in both addons and extensions json files, called addons :/
 				for addon in addons:
 
-					#dictionary for extension info
+					#dictionary for addon/extension info
 					extensionInfo = {}
 
 					#wrap
@@ -382,30 +407,72 @@ class scan(IPlugin):
 							#save
 							extensionInfo['id'] = addon['id']
 
-						#extract name
-						if 'name' in addon:
+						#skip duplicates
+						# ->extensions can show up in addons.json and extensions.json
+						if addon['id'] in extensionIDs:
 
-							#save
-							extensionInfo['name'] = addon['name']
-
-						#extract description
-						if 'description' in addon:
-
-							#save
-							extensionInfo['description'] = addon['description'].replace('\n', ' ')
-
-						#build path
-						# ->should be in the extensions/ folder, under <id>.XPI
-						path = os.path.split(firefoxExtensionFile)[0] + '/extensions/' + addon['id'] + '.xpi'
-
-						#ignore .xpi's that don't exist
-						if not os.path.exists(path):
-
-							#skip
+							#skip dupe
 							continue
 
-						#save path
-						extensionInfo['path'] = path
+						#json in addons.json file is formatted one way
+						if 'addons.json' == os.path.split(firefoxExtensionFile)[1]:
+
+							#extract name
+							if 'name' in addon:
+
+								#save
+								extensionInfo['name'] = addon['name']
+
+							#extract description
+							if 'description' in addon:
+
+								#save
+								extensionInfo['description'] = addon['description'].replace('\n', ' ')
+
+							#build path
+							# ->should be in the extensions/ folder, under <id>.XPI
+							path = os.path.split(firefoxExtensionFile)[0] + '/extensions/' + addon['id'] + '.xpi'
+
+							#ignore .xpi's that don't exist
+							if not os.path.exists(path):
+
+								#skip
+								continue
+
+							#save path
+							extensionInfo['path'] = path
+
+						#json in extensions.json file is formatted another way
+						else:
+
+							#extract name
+							if 'defaultLocale' in addon and 'name' in addon['defaultLocale']:
+
+								#save
+								extensionInfo['name'] = addon['defaultLocale']['name']
+
+							#extract description
+							if 'defaultLocale' in addon and 'description' in addon['defaultLocale']:
+
+								#save
+								extensionInfo['description'] = addon['defaultLocale']['description']
+
+							#build path
+							# ->should be a directory in the extensions/ folder, under <id>
+							path = os.path.split(firefoxExtensionFile)[0] + '/extensions/' + addon['id']
+
+							#ignore those that don't exist
+							if not os.path.exists(path):
+
+								#skip
+								continue
+
+							#save path
+							extensionInfo['path'] = path
+
+						#save extension id
+						# ->used to prevent dupes
+						extensionIDs.append(extensionInfo['id'])
 
 						#create and append addon (extension)
 						results.append(extension.Extension(extensionInfo))
@@ -413,6 +480,7 @@ class scan(IPlugin):
 					#ignore exceptions
 					except Exception, e:
 
+						#leave in err msg (for now)
 						print e
 						traceback.print_exc()
 

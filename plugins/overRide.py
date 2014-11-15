@@ -32,9 +32,6 @@ OVERRIDES_NAME = 'Overrides'
 #for output, description of items
 OVERRIDES_DESCRIPTION = 'Binaries that are executed before/during login'
 
-
-#TODO: test this with persistent app
-
 class scan(IPlugin):
 
 	#init results dictionary
@@ -64,16 +61,16 @@ class scan(IPlugin):
 
 		#process
 		# ->check all files for overrides
-		for overide in overrides:
+		for override in overrides:
 
 			#wrap
 			try:
 
 				#dbg msg
-				utils.logMessage(utils.MODE_INFO, 'opening %s' % overide)
+				utils.logMessage(utils.MODE_INFO, 'opening %s' % override)
 
 				#load plist and check
-				plistData = utils.loadPlist(overide)
+				plistData = utils.loadPlist(override)
 
 				#extract sandboxed login items
 				# ->helper apps
@@ -159,7 +156,7 @@ class scan(IPlugin):
 						continue
 
 			#ignore exceptions
-			except Exception, e:
+			except:
 
 				#skip
 				continue

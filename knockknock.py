@@ -209,7 +209,7 @@ def initKK():
 	if 0 != os.geteuid():
 
 		#dbg msg
-		utils.logMessage(utils.MODE_INFO, 'not running as r00t...some results may be missed')
+		utils.logMessage(utils.MODE_INFO, 'not running as r00t...some results may be missed (e.g. CronJobs)')
 
 	return True
 
