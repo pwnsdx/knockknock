@@ -6,7 +6,6 @@
 import os
 import sys
 import json
-import argparse
 import traceback
 
 #project imports
@@ -128,6 +127,7 @@ def knocknock():
 
 
 #initialize knockknock
+#TODO: test with python 2.6
 def initKK():
 
 	#global args
@@ -135,6 +135,9 @@ def initKK():
 
 	#global import
 	global PluginManager
+
+	#global import
+	global argparse
 
 	#get python version
 	pythonVersion = sys.version_info
@@ -145,6 +148,26 @@ def initKK():
 		#err msg
 		# ->as logging isn't init'd yet, just print directly
 		print('ERROR: KnockKnock requires python 2.7+ (found: %s)' % (pythonVersion))
+
+		#bail
+		return False
+
+	#TODO: check for python 3.0?
+
+	#try import argparse
+	# ->should work now since just checked that python is 2.7+
+	try:
+
+		#import
+		import argparse
+
+	#handle exception
+	# ->bail w/ error msg
+	except ImportError:
+
+		#err msg
+		# ->as logging isn't init'd yet, just print directly
+		print('ERROR: could not load required module (argparse)')
 
 		#bail
 		return False

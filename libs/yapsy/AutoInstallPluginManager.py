@@ -136,9 +136,13 @@ class AutoInstallPluginManager(PluginManagerDecorator):
 		if not os.path.isfile(plugin_ZIP_filename):
 			log.warning("Could not find the plugin's zip file at '%s'." % plugin_ZIP_filename)
 			return False
-		candidateZipFile = zipfile.ZipFile(plugin_ZIP_filename)
-		if candidateZipFile.testzip() is not None:
-			log.warning("Corruption detected in Zip file '%s'." % plugin_ZIP_filename)
+		try:
+			candidateZipFile = zipfile.ZipFile(plugin_ZIP_filename)
+			first_bad_file = candidateZipFile.testzip()
+			if first_bad_file:
+				raise Exception("Corrupted ZIP with first bad file '%s'" % first_bad_file)
+		except Exception,e:
+			log.warning("Invalid zip file '%s' (error: %s)." % (plugin_ZIP_filename,e))
 			return False
 		zipContent = candidateZipFile.namelist()
 		log.info("Investigating the content of a zip file containing: '%s'" % zipContent)
