@@ -145,6 +145,12 @@ class scan(IPlugin):
 				#load plist
 				plistData = utils.loadPlist(plist)
 
+				#skip files that couldn't be loaded
+				if not plistData:
+
+					#skip
+					continue
+
 				#skip disabled launch items
 				if 'Label' in plistData and plistData['Label'] in self.disabledItems:
 
@@ -207,8 +213,6 @@ class scan(IPlugin):
 
 			#ignore exceptions
 			except Exception, e:
-
-				print 'EX: %s' % e
 
 				#ignore
 				pass
