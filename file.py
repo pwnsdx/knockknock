@@ -65,8 +65,6 @@ class File():
 		#init whitelist flag
 		self.isWhitelisted = False
 
-		#init signing authorities
-		self.signingAuthorities = None
 
 		#check if its whitelisted
 		# ->path is key
@@ -76,7 +74,10 @@ class File():
 		 	self.isWhitelisted = (self.hash in whitelist.whitelistedFiles[self.path])
 
 		#init
-		self.signatureStatus = utils.errSecCSUnsigned
+		self.signatureStatus = None
+
+		#init signing authorities
+		self.signingAuthorities = None
 
 		#check if signed and if so, by apple
 		# note: sets class's signatureStatus and signingAuthorities iVars
@@ -105,15 +106,43 @@ class File():
 	#for normal output
 	def prettyPrint(self):
 
+		signedMsg = ''
+
+		#handle when file is signed
+		if 0 == self.signatureStatus:
+
+			#yup
+			signedMsg = 'yes'
+
+			#add signing auth's
+			if len(self.signingAuthorities):
+
+				#add
+				signedMsg += ' (%s)' % self.signingAuthorities
+
+		#handle when file is not signed
+		elif self.signatureStatus:
+
+			#no
+			signedMsg = 'no (%d)' % self.signatureStatus
+
+		#error case
+		# ->couldn't check signature
+		else:
+
+			#unknown
+			signedMsg = 'unknown'
+
+
 		#non-plisted files
 		if not self.plist:
 
-			return '\n%s\n path: %s\n hash: %s\n' % (self.name, self.path, self.hash)
+			return '\n%s\n path: %s\n hash: %s\n signed? %s\n' % (self.name, self.path, self.hash, signedMsg)
 
 		#plisted files
 		else:
 
-			return '\n%s\n path: %s\n plist: %s\n hash: %s\n' % (self.name, self.path, self.plist, self.hash)
+			return '\n%s\n path: %s\n plist: %s\n hash: %s \n signed? %s\n' % (self.name, self.path, self.plist, self.hash, signedMsg)
 
 
 	#determine if a file (or bundle) is signed, and if so, by Apple
@@ -131,6 +160,15 @@ class File():
 
 		#check the signature
 		(status, self.signatureStatus, self.signingAuthorities) = utils.checkSignature(path, self.bundle)
+
+		#check
+		if 0 != status:
+
+			#reset
+			self.signatureStatus = None
+
+			#reset
+			self.signingAuthorities = []
 
 		return
 

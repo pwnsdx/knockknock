@@ -1,0 +1,8 @@
+[Core]
+Name = Unclassified Item Scanner
+Module = unclassified
+
+[Documentation]
+Author = Patrick W
+Version = 1.0
+Description = Plugin that scans for running items that can't be classified by other plugins

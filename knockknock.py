@@ -104,6 +104,10 @@ def knocknock():
 					# ->subtract out all ignored/whitelisted items
 					result['items'] =  list(set(result['items']) - set(ignoredItems))
 
+		#filter out dups in unclassified plugin
+		# ->needed since it just looks at the proc list
+		removeUnclassDups(results)
+
 		#format output
 		# ->normal output or JSON
 		formattedResults = output.formatResults(results, args.json)
@@ -124,6 +128,66 @@ def knocknock():
 		return False
 
 	return True
+
+#filter out dups in unclassified plugin
+# ->needed, since it just looks at the proc list so grabs items that are likely detected/classified elsewhere
+def removeUnclassDups(results):
+
+	#unique unclass'd items
+	uniqueItems = []
+
+	#get unclassifed results
+	unclassItems = [result for result in results if result['name'] == 'Unclassified Items']
+
+	#bail if there aren't any
+	if not unclassItems:
+
+		#none
+		return
+
+	#just want the dictionary
+	# ->first item
+	unclassItems = unclassItems[0]
+
+	#get all hashes
+	hashes = allHashes(results)
+
+	#look at each unclass item
+	# ->remove it if its reported elsewhere
+	for unclassItem in unclassItems['items']:
+
+		#only keep otherwise unknown items
+		if 0x1 == hashes.count(unclassItem.hash):
+
+			#save
+			uniqueItems.append(unclassItem)
+
+	#update
+	unclassItems['items'] = uniqueItems
+
+	return
+
+#return a list of hashes of all startup items (files)
+def allHashes(results):
+
+	#list of hashes
+	hashes = []
+
+	#iterate over all results
+	# ->grab file hashes
+	for result in results:
+
+		#hash all files
+		for startupObj in result['items']:
+
+			#check for file
+			if isinstance(startupObj, file.File):
+
+				#save hash
+				hashes.append(startupObj.hash)
+
+	return hashes
+
 
 
 #initialize knockknock
@@ -412,4 +476,3 @@ if __name__ == '__main__':
 
 	#main interface
 	knocknock()
-

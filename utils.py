@@ -1,8 +1,10 @@
 __author__ = 'patrick'
 
 import os
+import re
 import sys
 import glob
+import shlex
 import ctypes
 import fnmatch
 import hashlib
@@ -75,6 +77,12 @@ USER_BASE_DIRECTORY = '/Users/'
 
 #apple prefix
 __kOSKextApplePrefix = 'com.apple.'
+
+#process type, not dock
+PROCESS_TYPE_BG = 0x0
+
+#process type, dock
+PROCESS_TYPE_DOCK = 0x1
 
 '''
 kSecCSCheckAllArchitectures = 1 << 0
@@ -577,6 +585,7 @@ def checkSignature(file, bundle=None):
 	#check signature
 	signedStatus = securityFramework.SecStaticCodeCheckValidityWithErrors(staticCode, kSecCSDoNotValidateResources,
 																		  None, None)
+
 	#make sure binary is signed
 	# ->then, extract signing authorities
 	if errSecSuccess == signedStatus:
@@ -587,6 +596,8 @@ def checkSignature(file, bundle=None):
 		#get code signing info, including authorities and check
 		result = securityFramework.SecCodeCopySigningInformation(staticCode, kSecCSSigningInformation,
 																 ctypes.byref(information))
+
+		#check result
 		if errSecSuccess != result:
 
 			#err msg
@@ -880,5 +891,316 @@ def md5sum(filename):
 		digest = None
 
 	return digest
+
+
+#use 'ps' to get list of running processes
+def getProcessList():
+
+	#process info
+	processesInfo = {}
+
+	#use ps to get process list
+	# ->includes full path + args
+	psOutput = subprocess.check_output(['ps',  '-ax',  '-o' 'pid,ppid,uid,etime,command'])
+
+	#parse/split output
+	# ->note: first line is skipped as its the column headers
+	for line in psOutput.split('\n')[1:]:
+
+		#dictionary for process info
+		processInfo = {}
+
+		try:
+
+			#split
+			components = line.split()
+
+			#skip path's that don't start with '/
+			if len(components) < 5 or '/' != components[4][0]:
+
+				#skip
+				continue
+
+			#pid
+			# ->key, but also but save oid into dictionary too
+			processInfo['pid'] =  int(components[0])
+
+			#ppid
+			processInfo['ppid'] =  int(components[1])
+
+			#uid
+			processInfo['uid'] =  int(components[2])
+
+			#etime
+			# ->convert to abs time
+			processInfo['etime'] = convertElapsedToAbs(components[3])
+
+			#path
+			# note: this will contains args, but these are removed below
+			processInfo['path'] = ' '.join(components[4:])
+
+			#add to list
+			processesInfo[processInfo['pid']] = processInfo
+
+		#ignore exceptions
+		except:
+
+			#skip
+			continue
+
+	#invoke ps again to get process list
+	# ->this time just with process pid and name (helps with parsing off args)
+	psOutput = subprocess.check_output(['ps',  '-ax',  '-o', 'pid,command', '-c'])
+
+	#parse/split output
+	# ->note: first line is skipped as its the column headers
+	for line in psOutput.split('\n')[1:]:
+
+		#print '2 LINE: %s' % line
+
+		#split
+		components = line.split()
+
+		#sanity check
+		if len(components) < 2:
+
+			#skip
+			continue
+
+		#pid
+		pid = int(components[0])
+
+		#process name
+		# ->rest of line
+		name = ' '.join(components[1:])
+
+		#make sure pid exists
+		if pid not in processesInfo:
+
+			#print 'skipping since no proc!'
+
+			#skip
+			continue
+
+		#process's full path + args
+		fullPath = processesInfo[pid]['path']
+
+		#if process doesn't have any args
+		# ->no processing needed
+		if fullPath.endswith('/' + name):
+
+			#skip
+			continue
+
+		#wrap
+		try:
+
+			#ok, find the process name + ' '
+			# ->we'll assume that this is the real end of the full path (e.g. before any args)
+			processesInfo[pid]['path'] = fullPath[:fullPath.index(name + ' ') + len(name)]
+
+			#print 'updated: %s' % processesInfo[pid]['path']
+
+		#ignore ignore exceptions
+		except:
+
+			#skip
+			continue
+
+	return processesInfo
+
+
+#iterates over list of processes
+# ->finds each parent's top parent (if its not launchd)
+def setFirstParent(processes):
+
+	#iterate over all processes
+	for pid in processes:
+
+		#get current process
+		process = processes[pid]
+
+		#default gpid
+		process['gpid'] = -1
+
+		#skip if ppid is 0x0 or 0x1 (launchd)
+		if 0x0 == process['ppid'] or 0x1 == process['ppid']:
+
+			#set to self parent
+			process['gpid'] = process['ppid']
+
+			#do next
+			continue
+
+		#sanity check
+		if process['ppid'] not in processes:
+
+			#try next
+			continue
+
+		#get next parent
+		parentProcess = processes[process['ppid']]
+
+		#search for parent right below launchd (pid 0x1)
+		while True:
+
+			#found it?
+			if 0x1 == parentProcess['ppid']:
+
+				#save this as the gpid
+				process['gpid'] = parentProcess['pid']
+
+				#bail
+				break
+
+			#sanity check
+			if parentProcess['ppid'] not in processes:
+
+				#couldn't find parent's pid
+				# ->just save current parent's pid as gpid
+				process['gpid'] = parentProcess['pid']
+
+				#bail
+				break
+
+			#try next
+			parentProcess = processes[parentProcess['ppid']]
+
+	return
+
+#classify each process on whether it has a dock icon or not
+# ->sets process 'type' key
+def setProcessType(processes):
+
+	#iterate over all processes
+	for pid in processes:
+
+		#get current process
+		process = processes[pid]
+
+		#get processes .app/ (bundle) directory
+		appDirectory = findAppDirectory(process['path'])
+
+		#non-apps can't have a dock icon
+		if not appDirectory:
+
+			#set as non-dock
+			process['type'] = PROCESS_TYPE_BG
+
+			#next
+			continue
+
+		#wrap
+		try:
+
+			#load Info.plist
+			infoPlist = loadInfoPlist(appDirectory)
+
+			#couldn't load plist
+			if not infoPlist:
+
+				#set as non-dock
+				process['type'] = PROCESS_TYPE_BG
+
+				#next
+				continue
+
+			#plist that have a LSUIElement and its set to 0x1
+			# ->background app
+			if 'LSUIElement' in infoPlist and 0x1 == infoPlist['LSUIElement']:
+
+				#set as non-dock
+				process['type'] = PROCESS_TYPE_BG
+
+				#next
+				continue
+
+			#get here if its an .app, that doesn't have 'LSUIElement' set
+			# ->assume its a dock app
+			process['type'] = PROCESS_TYPE_DOCK
+
+		#ignore exceptions
+		except:
+
+			#ignore
+			continue
+
+	return
+
+
+#given a binary, find its .app directory
+def findAppDirectory(binary):
+
+	#app dir
+	appDirectory = None
+
+	#split path
+	# ->init w/ binary
+	splitPath = binary
+
+	#bail if path doesn't contain '.app'
+	if '.app' not in binary:
+
+		#bail
+		return None
+
+	#scan back up to .app/
+	while '/' != splitPath and not splitPath.endswith('.app'):
+
+		#split and grab directory component
+		# ->this will be one directory
+		splitPath = os.path.split(splitPath)[0]
+
+	#bail if not found
+	if not splitPath.endswith('.app'):
+
+		#bail
+		return None
+
+	#open /Contents/Info.plist
+	mainBundle = Foundation.NSBundle.bundleWithPath_(splitPath)
+
+	#bail if app's executable matches what was passed in
+	if mainBundle is None or mainBundle.executablePath != binary:
+
+		#match, so save .app/ dir
+		appDirectory = splitPath
+
+	return appDirectory
+
+#convert elapsed time (from ps -o etime) to absolute time in seceond
+# elapsed time format: [[dd-]hh:]mm:ss
+def convertElapsedToAbs(elapsedTime):
+
+	#time in seconds
+	absoluteTime = 0
+
+	#split on ':' and '-'
+	timeComponent = re.split('[: -]', elapsedTime)
+
+	#print 'TIME: %s / %s' % (elapsedTime, timeComponent)
+
+	#seconds always included
+	absoluteTime += int(timeComponent[-1])
+
+	#minutes always included
+	absoluteTime += int(timeComponent[-2]) * 60
+
+	#hours are optional
+	if len(timeComponent) >= 3:
+
+		#add hours
+		absoluteTime += int(timeComponent[-3]) * 60 * 60
+
+	#days are optional
+	if len(timeComponent) == 4:
+
+		#add hours
+		absoluteTime += int(timeComponent[-4]) * 60 * 60 * 24
+
+
+	#print 'TIME (ABS): %d' % absoluteTime
+
+	return absoluteTime
 
 

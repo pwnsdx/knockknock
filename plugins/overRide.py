@@ -66,9 +66,6 @@ class scan(IPlugin):
 			#wrap
 			try:
 
-				#dbg msg
-				utils.logMessage(utils.MODE_INFO, 'opening %s' % override)
-
 				#load plist and check
 				plistData = utils.loadPlist(override)
 
