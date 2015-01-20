@@ -59,12 +59,8 @@ class File():
 		#compute/save hash
 		self.hash = utils.md5sum(self.path)
 
-		#compute/save size
-		self.size = os.path.getsize(self.path)
-
 		#init whitelist flag
 		self.isWhitelisted = False
-
 
 		#check if its whitelisted
 		# ->path is key
@@ -107,6 +103,13 @@ class File():
 	def prettyPrint(self):
 
 		signedMsg = ''
+
+		#handle case where hash was unable to be generated
+		# ->file wasn't found/couldn't be accessed
+		if not self.hash:
+
+			#set some default
+			self.hash = 'unknown'
 
 		#handle when file is signed
 		if 0 == self.signatureStatus:
