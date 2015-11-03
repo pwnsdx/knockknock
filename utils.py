@@ -22,8 +22,8 @@ SUPPORTED_OS_VERSION = 10
 MIN_OS_VERSION_MINOR = 9
 
 #max supported OS X version (minor)
-# ->10.10
-MAX_OS_VERSION_MINOR = 10
+# ->10.11
+MAX_OS_VERSION_MINOR = 11
 
 #global verbose/logging flag
 verbose = False
@@ -411,14 +411,14 @@ def isKext(path):
 	#ignore exceptions
 	except Exception, e:
 
-		print e
+		#print e
 
 		#ignore
 		pass
 
 	return bundleIsKext
 
-#TODO: memory free'ing?
+#check the signature of a file
 def checkSignature(file, bundle=None):
 
 	#global security framework 'handle'
@@ -427,12 +427,18 @@ def checkSignature(file, bundle=None):
 	#global objcRuntime 'handle'
 	global objcRuntime
 
+	#return dictionary
+	signingInfo = {}
+
 	#status
-	# ->just related to execution (e.g. API errors)
+	#  ->just related to execution (e.g. API errors)
 	status = not errSecSuccess
 
 	#signed status of file
 	signedStatus = None
+
+	#flag indicating is from Apple
+	isApple = False
 
 	#list of authorities
 	authorities = []
@@ -448,7 +454,7 @@ def checkSignature(file, bundle=None):
 			logMessage(MODE_ERROR, 'could not load securityFramework')
 
 			#bail
-			return (status, None, None)
+			return (status, None)
 
 	#load objC runtime lib
 	if not objcRuntime:
@@ -461,7 +467,7 @@ def checkSignature(file, bundle=None):
 			logMessage(MODE_ERROR, 'could not load objcRuntime library')
 
 			#bail
-			return (status, None, None)
+			return (status, None)
 
 		#init objc_getClass function's return types
 		objcRuntime.objc_getClass.restype = ctypes.c_void_p
@@ -479,7 +485,7 @@ def checkSignature(file, bundle=None):
 	path = Foundation.NSURL.URLWithString_(Foundation.NSString.stringWithUTF8String_(file))
 
 	#pointer for static code
-	staticCode = ctypes.c_void_p(0)  #ctypes.c_uint64(0)
+	staticCode = ctypes.c_void_p(0)
 
 	#create static code from path and check
 	result = securityFramework.SecStaticCodeCreateWithPath(ctypes.c_void_p(objc.pyobjc_id(path)), kSecCSDefaultFlags, ctypes.byref(staticCode))
@@ -502,93 +508,44 @@ def checkSignature(file, bundle=None):
 		logMessage(MODE_ERROR, 'SecStaticCodeCreateWithPath(\'%s\') failed with %d' % (path, result), shouldSupress)
 
 		#bail
-		return (status, None, None)
-
-	#checking the signature of a kext requires the use of a requirement string
-	# ->initialize this based on bundle ID
-	#   see: checkKextSignature() in security.c (kext_tools) for details
-	'''if bundle and isKext(bundle):
-
-		#requirement reference
-		# ->used for checking signature of kexts
-		#requirementReference = None
-
-		#requirement = None
-
-		#wrap
-		try:
-
-			#load kext's plist
-			kextPlist = loadPlist(os.path.join(bundle, 'Contents', 'Info.plist'))
-
-			#extract bundle ID
-			bundleID = kextPlist['CFBundleIdentifier']
-
-			#set requirement reference for Apple's kexts
-			if bundleID.startswith(__kOSKextApplePrefix):
-
-				#set
-				requirementReference = "anchor apple"
-
-			#set requirement reference for non-Apple's kexts
-			else:
-
-				#set
-				requirementReference = "anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] and certificate leaf[field.1.2.840.113635.100.6.1.13] and certificate leaf[field.1.2.840.113635.100.6.1.18]"
-
-
-			#get NSString class
-			NSString = objcRuntime.objc_getClass('NSString')
-
-			#init return type for 'stringWithUTF8String:' method
-			objcRuntime.objc_msgSend.restype = ctypes.c_void_p
-
-			#init arg types for 'stringWithUTF8String:' method
-			objcRuntime.objc_msgSend.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
-
-			#init key via 'stringWithUTF8String:' method
-			requirementsString = objcRuntime.objc_msgSend(NSString, objcRuntime.sel_registerName('stringWithUTF8String:'), requirementReference)
-
-			#print 'type of requirementsString'
-			#print type(requirementsString)
-
-			#pointer for requirement
-			requirement = ctypes.c_void_p(0)
-
-			#create sec requirement
-			if errSecSuccess != securityFramework.SecRequirementCreateWithString(ctypes.c_void_p(requirementsString), kSecCSDefaultFlags, ctypes.byref(requirement)):
-
-				#print 'ERROR'
-				pass
-			else:
-
-				pass
-				#print 'OK'
-
-
-			#	print 'ERRROR: SecRequirementCreateWithString()'
-
-			#else:
-
-			#	print 'OK!!'
-
-		#ignore exceptions
-		except:
-
-			#ignore
-			pass
-	'''
-
-	#print 'securityFramework.SecStaticCodeCheckValidity:',
-	#print securityFramework.SecStaticCodeCheckValidity(staticCode, 1 << 30, None)
+		return (status, None)
 
 	#check signature
 	signedStatus = securityFramework.SecStaticCodeCheckValidityWithErrors(staticCode, kSecCSDoNotValidateResources,
 																		  None, None)
 
 	#make sure binary is signed
-	# ->then, extract signing authorities
+	# ->then, determine if signed by apple & always extract signing authorities
 	if errSecSuccess == signedStatus:
+
+		#set requirement string
+		# ->check for 'signed by apple'
+		requirementReference = "anchor apple"
+
+		#get NSString class
+		NSString = objcRuntime.objc_getClass('NSString')
+
+		#init return type for 'stringWithUTF8String:' method
+		objcRuntime.objc_msgSend.restype = ctypes.c_void_p
+
+		#init arg types for 'stringWithUTF8String:' method
+		objcRuntime.objc_msgSend.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
+
+		#init key via 'stringWithUTF8String:' method
+		requirementsString = objcRuntime.objc_msgSend(NSString, objcRuntime.sel_registerName('stringWithUTF8String:'), requirementReference)
+
+		#pointer for requirement
+		requirement = ctypes.c_void_p(0)
+
+		#first check if binary is signed by Apple
+		# ->create sec requirement
+		if errSecSuccess == securityFramework.SecRequirementCreateWithString(ctypes.c_void_p(requirementsString), kSecCSDefaultFlags, ctypes.byref(requirement)):
+
+			#verify against requirement signature
+			if errSecSuccess == securityFramework.SecStaticCodeCheckValidity(staticCode, kSecCSDoNotValidateResources, requirement):
+
+				#signed by apple
+				isApple = True
 
 		#pointer for info dictionary
 		information = ctypes.c_void_p(0)
@@ -604,10 +561,7 @@ def checkSignature(file, bundle=None):
 			logMessage(MODE_ERROR, 'SecCodeCopySigningInformation() failed with %d' % result)
 
 			#bail
-			return (status, None, None)
-
-		#get NSString class
-		NSString = objcRuntime.objc_getClass('NSString')
+			return (status, None)
 
 		#init return type for 'stringWithUTF8String:' method
 		objcRuntime.objc_msgSend.restype = ctypes.c_void_p
@@ -675,7 +629,16 @@ def checkSignature(file, bundle=None):
 	# ->might be unsigned though
 	status = errSecSuccess
 
-	return (status, signedStatus, authorities)
+	#save signed status
+	signingInfo['status'] = signedStatus
+
+	#save flag indicating file signed by apple
+	signingInfo['isApple'] = isApple
+
+	#save signing authorities
+	signingInfo['authorities'] = authorities
+
+	return (status, signingInfo)
 
 #parse a bash file (yes, this is a hack and needs to be improved)
 # ->returns a list of all commands that are not within a function

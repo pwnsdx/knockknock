@@ -6,15 +6,18 @@ __author__ = 'patrick w'
     this plugin (which should be run as root) parses the login/logout plist file to extract any such hooks
 '''
 
+import os
+
 #project imports
+import file
 import utils
 import command
 
 #plugin framwork import
 from yapsy.IPlugin import IPlugin
 
-#login window file
-LOGIN_WINDOW_FILE = '/private/var/root/Library/Preferences/com.apple.loginwindow.plist'
+#login window directories
+LOGIN_WINDOW_FILES = ['/private/var/root/Library/Preferences/com.apple.loginwindow.plist', '/Library/Preferences/com.apple.loginwindow.plist', '~/Library/Preferences/com.apple.loginwindow.plist']
 
 #for output, item name
 LOGIN_HOOK_NAME = 'Login Hook'
@@ -55,22 +58,48 @@ class scan(IPlugin):
 		# ->for logout hook
 		results.append(self.initResults(LOGOUT_HOOK_NAME, LOGOUT_HOOK_DESCRIPTION))
 
-		#load plist
-		plistData = utils.loadPlist(LOGIN_WINDOW_FILE)
+		#expand all login/out files
+		logInOutFiles = utils.expandPaths(LOGIN_WINDOW_FILES)
 
-		#make sure plist loaded
-		if plistData:
+		#scan each file
+		for logInOutFile in logInOutFiles:
 
-			#grab login hook
-			if 'LoginHook' in plistData:
+			#load plist
+			plistData = utils.loadPlist(logInOutFile)
 
-				#save into first index of result
-				results[0]['items'].append(command.Command(plistData['LoginHook']))
+			#make sure plist loaded
+			if plistData:
 
-			#grab logout hook
-			if 'LogoutHook' in plistData:
+				#grab login hook
+				if 'LoginHook' in plistData:
 
-				#save into second index of result
-				results[1]['items'].append(command.Command(plistData['LogoutHook']))
+					#check if its a file
+					if os.path.isfile(plistData['LoginHook']):
+
+						#save file
+						results[0]['items'].append(file.File(plistData['LoginHook']))
+
+					#likely a command
+					# ->could be file that doesn't exist, but ok to still report
+					else:
+
+						#save command
+						results[0]['items'].append(command.Command(plistData['LoginHook'], logInOutFile))
+
+				#grab logout hook
+				if 'LogoutHook' in plistData:
+
+					#check if its a file
+					if os.path.isfile(plistData['LogoutHook']):
+
+						#save file
+						results[1]['items'].append(file.File(plistData['LogoutHook']))
+
+					#likely a command
+					# ->could be file that doesn't exist, but ok to still report
+					else:
+
+						#save command
+						results[1]['items'].append(command.Command(plistData['LogoutHook'], logInOutFile))
 
 		return results

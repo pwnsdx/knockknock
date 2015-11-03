@@ -14,6 +14,7 @@ import utils
 import output
 import command
 import whitelist
+import virusTotal
 
 #directory containing plugins
 PLUGIN_DIR = "plugins/"
@@ -89,7 +90,7 @@ def knocknock():
 					if isinstance(startupObj, file.File):
 
 						#by default, ignore signed by Apple
-						if not args.apple and startupObj.signedByApple():
+						if not args.apple and startupObj.signedByApple:
 
 							#add to list
 							ignoredItems.append(startupObj)
@@ -107,6 +108,16 @@ def knocknock():
 		#filter out dups in unclassified plugin
 		# ->needed since it just looks at the proc list
 		removeUnclassDups(results)
+
+		#get vt results
+		if not args.disableVT:
+
+			#dbg msg
+			utils.logMessage(utils.MODE_INFO, 'querying VirusTotal - sit tight!')
+
+			#process
+			# ->will query VT and add VT info to all files
+			virusTotal.processResults(results)
 
 		#format output
 		# ->normal output or JSON
@@ -189,7 +200,6 @@ def allHashes(results):
 	return hashes
 
 
-
 #initialize knockknock
 #TODO: test with python 2.6
 def initKK():
@@ -262,7 +272,7 @@ def initKK():
 	if not utils.isSupportedOS():
 
 		#dbg msg
-		utils.logMessage(utils.MODE_WARN, '%s is not an officially supported OS X version (you milage may vary)' % ('.'.join(utils.getOSVersion())))
+		utils.logMessage(utils.MODE_WARN, '%s is not an officially supported OS X version (your milage may vary)' % ('.'.join(utils.getOSVersion())))
 
 	#dbg msg
 	else:
@@ -335,6 +345,10 @@ def parseArgs():
 	# ->optional
 	parser.add_argument('-j', '--json', help='produce output in JSON format', action='store_true')
 
+	#arg, disable VT integration
+	# ->optional
+	parser.add_argument('-d','--disableVT', help='disable VirusTotal integration', action='store_true')
+
 	#parse args
 	return parser.parse_args()
 
@@ -371,7 +385,7 @@ def listPlugins():
 	utils.logMessage(utils.MODE_INFO, 'listing plugins')
 
 	#interate over all plugins
-	for plugin in pluginManagerObj.getAllPlugins():
+	for plugin in sorted(pluginManagerObj.getAllPlugins(), key=lambda x: x.name):
 
 		#dbg msg
 		# ->always use print, since -v might not have been used

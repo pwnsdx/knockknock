@@ -1,0 +1,8 @@
+[Core]
+Name = RC Script Scanner
+Module = rcScript
+
+[Documentation]
+Author = Patrick W
+Version = 1.0
+Description = Plugin that parses the /etc/rc.common, /etc/installer_cleanup, etc files for embedded commands

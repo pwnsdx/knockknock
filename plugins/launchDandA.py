@@ -46,8 +46,8 @@ OVERRIDES_DIRECTORY = '/private/var/db/launchd.db/'
 
 class scan(IPlugin):
 
-	#disabled items
-	disabledItems = []
+	#overrides items
+	overriddenItems = {}
 
 	#init results dictionary
 	# ->item name, description, and list
@@ -73,9 +73,9 @@ class scan(IPlugin):
 		# ->for launch agents
 		results.append(self.initResults(LAUNCH_AGENT_NAME, LAUNCH_AGENT_DESCRIPTION))
 
-		#init disabled items
-		# ->scans overrides plists
-		self.disabledItems = self.getDisabledItems()
+		#init overriden items
+		# ->scans overrides plists, and populates 'overriddenItems' class variable
+		self.getOverriddenItems()
 
 		#scan for auto-run launch daemons
 		# ->save in first index of array
@@ -123,7 +123,6 @@ class scan(IPlugin):
 
 		return results
 
-
 	#given a list of (launch daemon/agent) plists
 	# ->return a list of their binaries that are set to auto run
 	#   this is done by looking for 'RunAtLoad' &&/|| 'KeepAlive' set to true
@@ -151,22 +150,11 @@ class scan(IPlugin):
 					#skip
 					continue
 
-				#skip disabled launch items
-				if 'Label' in plistData and plistData['Label'] in self.disabledItems:
+				#skip non-autorun'd items
+				if not self.isAutoRun(plistData):
 
 					#skip
 					continue
-
-				#skip binaries that aren't auto run
-				if not 'RunAtLoad' in plistData or not plistData['RunAtLoad']:
-
-					#launch items can also be started with just 'KeepAlive'
-					# ->so if 'RunAtLoad' wasn't found, check for this too
-					if not 'KeepAlive' in plistData or not plistData['KeepAlive']:
-
-						#skip
-						# ->neither 'RunAtLoad' nor 'KeepAlive' is set
-						continue
 
 				#check for 'ProgramArguments' key
 				if 'ProgramArguments' in plistData:
@@ -219,12 +207,84 @@ class scan(IPlugin):
 
 		return autoRunBins
 
-	#scan the overrides files to determine if launch item is disabled
-	# ->returns list of disabled items
-	def getDisabledItems(self):
 
-		#list of disabled items
-		disabledItems = []
+	#determine if a launch item is set to auto run
+	# ->kinda some tricky(ish) logic based on a variety of conditions/flags
+	def isAutoRun(self, plistData):
+
+		#flag
+		isAutoRun = False
+
+		#'run at load' flag
+		runAtLoad = -1
+
+		#'keep alive' flag
+		keepAlive = -1
+
+		#'on demand' flag
+		onDemand = -1
+
+		#skip disabled launch items (overrides)
+		# ->note: overriddenItems var is a dictionary that has the disabled status
+		if 'Label' in plistData and plistData['Label'] in self.overriddenItems \
+			and self.overriddenItems[plistData['Label']]:
+
+			#print 'skipping disabled item (override): %s' % self.overriddenItems[plistData['Label']]
+
+			#nope
+			return False
+
+		#skip disabled launch items
+		# ->have to also check the overrides dictionary though
+		if 'Disabled' in plistData and plistData['Disabled']:
+
+			#make sure its not overridden (and enabled there)
+			if not plistData['Label'] in self.overriddenItems or \
+			   not self.overriddenItems[plistData['Label']]:
+
+				#skip
+				#print 'skipping disabled item: %s' % self.overriddenItems[plistData['Label']]
+
+				#nope
+				return False
+
+		#set 'run at load' flag
+		if 'RunAtLoad' in plistData and bool is type(plistData['RunAtLoad']):
+
+			#set
+			runAtLoad = plistData['RunAtLoad']
+
+		#set 'keep alive' flag
+		if 'KeepAlive' in plistData and bool is type(plistData['KeepAlive']):
+
+			#set
+			keepAlive = plistData['KeepAlive']
+
+		#set 'on demand' flag
+		if 'OnDemand' in plistData:
+
+			#set
+			onDemand = plistData['OnDemand']
+
+		#first check 'run at load' & 'keep alive'
+    	# ->either of these set to ok, means auto run!
+		if True == runAtLoad or True == keepAlive:
+
+			#yups
+			isAutoRun = True
+
+		#when neither 'RunAtLoad' and 'KeepAlive' not found
+    	#->check if 'OnDemand' is set to false (e.g. HackingTeam)
+		elif ((-1 == runAtLoad) and (-1 == keepAlive)) and \
+				(False == onDemand):
+
+			#yups
+			isAutoRun = True
+
+		return isAutoRun
+
+	#scan the overrides files to determine if launch item is enabled/disabled
+	def getOverriddenItems(self):
 
 		#get all overrides plists
 		overrides = glob.glob(OVERRIDES_DIRECTORY + '*/overrides.plist')
@@ -249,11 +309,11 @@ class scan(IPlugin):
 				#now parse 'normal' overrides
 				for overrideItem in plistData:
 
-					#check if item is disabled
-					if 'Disabled' in plistData[overrideItem] and plistData[overrideItem]['Disabled']:
+					#check if item has disabled flag (true/false)
+					if 'Disabled' in plistData[overrideItem]:
 
 						#save
-						disabledItems.append(overrideItem)
+						self.overriddenItems[overrideItem] = plistData[overrideItem]['Disabled']
 
 			#ignore exceptions
 			except Exception, e:
@@ -261,7 +321,7 @@ class scan(IPlugin):
 				#skip
 				continue
 
-		return disabledItems
+		return
 
 
 

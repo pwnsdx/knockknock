@@ -17,7 +17,7 @@ import utils
 from yapsy.IPlugin import IPlugin
 
 #(base) directory that has overrides for launch* and apps
-OVERRIDES_DIRECTORY = '/private/var/db/launchd.db/'
+OVERRIDES_DIRECTORIES = ['/private/var/db/launchd.db/', '/private/var/db/com.apple.xpc.launchd']
 
 #marker for finding sandboxed login item
 MARKER = '/contents/library/loginitems/'
@@ -44,6 +44,9 @@ class scan(IPlugin):
 	#invoked by core
 	def scan(self):
 
+		#overrides
+		overrides = []
+
 		#login items files
 		overriddenItems = []
 
@@ -57,7 +60,10 @@ class scan(IPlugin):
 		results = self.initResults(OVERRIDES_NAME, OVERRIDES_DESCRIPTION)
 
 		#get all overrides plists
-		overrides = glob.glob(OVERRIDES_DIRECTORY + '*/overrides.plist')
+		for overrideDirectory in OVERRIDES_DIRECTORIES:
+
+			#get all
+			overrides.extend(glob.glob(overrideDirectory + '*/overrides.plist'))
 
 		#process
 		# ->check all files for overrides
@@ -68,6 +74,12 @@ class scan(IPlugin):
 
 				#load plist and check
 				plistData = utils.loadPlist(override)
+
+				#skip any plist files that couldn't be loaded
+				if not plistData:
+
+					#skip
+					continue
 
 				#extract sandboxed login items
 				# ->helper apps
@@ -85,8 +97,15 @@ class scan(IPlugin):
 						# ->here, allows just single item to be skipped
 						try:
 
+							#print 'sandboxed item from SMLoginItemBookmarks: %s' % sandboxedLoginItem
+
+							#print self.parseBookmark(sandboxedLoginItemsBookmarks[sandboxedLoginItem])
+
 							#ignore disabled ones
 							if not self.isOverrideEnabled(plistData, sandboxedLoginItem):
+
+								#dbg msg
+								#print '%s is disabled!!' % sandboxedLoginItem
 
 								#skip
 								continue
@@ -115,6 +134,7 @@ class scan(IPlugin):
 							#skip
 							continue
 
+
 				#now parse 'normal' overrides
 				for overrideItem in plistData:
 
@@ -122,12 +142,14 @@ class scan(IPlugin):
 					# ->here, allows just single item to be skipped
 					try:
 
+
 						#skip the overrides that are also in the bookmark dictionary
 						# ->these were already processed (above)
 						if sandboxedLoginItemsBookmarks and overrideItem in sandboxedLoginItemsBookmarks:
 
 							#skip
 							continue
+
 
 						#ignore disabled ones
 						if not self.isOverrideEnabled(plistData, overrideItem):
@@ -153,7 +175,9 @@ class scan(IPlugin):
 						continue
 
 			#ignore exceptions
-			except:
+			except Exception, e:
+
+				#print e
 
 				#skip
 				continue

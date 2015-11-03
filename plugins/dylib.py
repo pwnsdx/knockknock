@@ -201,11 +201,21 @@ def scanPlists(plists, key, isLoaded=False):
 				#get path
 				plistPath = utils.getPathFromPlist(loadedPlist)
 
-			#check for/extract 'DYLD_INSERT_LIBRARIES'
-			if key in loadedPlist and 'DYLD_INSERT_LIBRARIES' in loadedPlist[key]:
+			#check for env key
+			# -> will be either 'EnvironmentVariables' or 'LSEnvironment' depending if launch item or app
+			if key in loadedPlist:
 
-				#create file obj and append to results
-				results.append(file.File(loadedPlist[key]['DYLD_INSERT_LIBRARIES'], plistPath))
+				#check for/save DYLD_INSERT_LIBRARIES
+				if 'DYLD_INSERT_LIBRARIES' in loadedPlist[key]:
+
+					#create file obj and append to results
+					results.append(file.File(loadedPlist[key]['DYLD_INSERT_LIBRARIES'], plistPath))
+
+				#check for/save __XPC_DYLD_INSERT_LIBRARIES
+				if '__XPC_DYLD_INSERT_LIBRARIES' in loadedPlist[key]:
+
+					#create file obj and append to results
+					results.append(file.File(loadedPlist[key]['__XPC_DYLD_INSERT_LIBRARIES'], plistPath))
 
 		#ignore exceptions
 		except Exception, e:

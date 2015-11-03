@@ -1,8 +1,0 @@
-[Core]
-Name = RC Common Script Scanner
-Module = rcCommon
-
-[Documentation]
-Author = Patrick W
-Version = 1.0
-Description = Plugin that parses the /etc/rc.common file for embedded commands

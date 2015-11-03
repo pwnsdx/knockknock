@@ -7,9 +7,6 @@ import json
 import utils
 import whitelist
 
-#apple signing authorities
-APPLE_AUTHORITIES = ['Apple Code Signing Certification Authority', 'Apple Root CA']
-
 class File():
 
 	#init method
@@ -75,9 +72,15 @@ class File():
 		#init signing authorities
 		self.signingAuthorities = None
 
-		#check if signed and if so, by apple
-		# note: sets class's signatureStatus and signingAuthorities iVars
+		#init apple flag
+		self.signedByApple = False
+
+		#check file is signed and if so, by apple
+		# note: sets class's signatureStatus/signingAuthorities & signedByApple class vars
 		self.initSigningStatus()
+
+		#init VT ratio
+		self.vtRatio = None
 
 		return
 
@@ -102,7 +105,11 @@ class File():
 	#for normal output
 	def prettyPrint(self):
 
+		#certificate info
 		signedMsg = ''
+
+		#VT ratio
+		vtRatio = ''
 
 		#handle case where hash was unable to be generated
 		# ->file wasn't found/couldn't be accessed
@@ -136,20 +143,22 @@ class File():
 			#unknown
 			signedMsg = 'unknown'
 
-
 		#non-plisted files
 		if not self.plist:
 
-			return '\n%s\n path: %s\n hash: %s\n signed? %s\n' % (self.name, self.path, self.hash, signedMsg)
+			return '\n%s\n path: %s\n hash: %s\n signed? %s\n VT ratio: %s\n' % (self.name, self.path, self.hash, signedMsg, self.vtRatio)
 
 		#plisted files
 		else:
 
-			return '\n%s\n path: %s\n plist: %s\n hash: %s \n signed? %s\n' % (self.name, self.path, self.plist, self.hash, signedMsg)
+			return '\n%s\n path: %s\n plist: %s\n hash: %s \n signed? %s\n VT ratio: %s\n' % (self.name, self.path, self.plist, self.hash, signedMsg, self.vtRatio)
 
 
 	#determine if a file (or bundle) is signed, and if so, by Apple
 	def initSigningStatus(self):
+
+		#signing info
+		signingInfo = {}
 
 		#default path to check as file's path
 		path = self.path
@@ -162,21 +171,19 @@ class File():
 			path = self.bundle
 
 		#check the signature
-		(status, self.signatureStatus, self.signingAuthorities) = utils.checkSignature(path, self.bundle)
+		(status, signingInfo) = utils.checkSignature(path, self.bundle)
 
-		#check
-		if 0 != status:
+		#on success
+		# ->save into class var
+		if 0 == status:
 
-			#reset
-			self.signatureStatus = None
+			#save sig status
+			self.signatureStatus = signingInfo['status']
 
-			#reset
-			self.signingAuthorities = []
+			#save apple flag
+			self.signedByApple = signingInfo['isApple']
+
+			#save authorities
+			self.signingAuthorities = signingInfo['authorities']
 
 		return
-
-	#check if a file is signed by Apple
-	def signedByApple(self):
-
-		#check that file is signed and is signed by apple
-		return self.signatureStatus == utils.SecCSSignatureOK and all(x in self.signingAuthorities for x in APPLE_AUTHORITIES)

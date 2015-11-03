@@ -9,10 +9,13 @@ class Command():
 
 	#init method
 	# ->save command and set white list flag
-	def __init__(self, command):
+	def __init__(self, command, file=None):
 
 		#save command
 		self.command = command
+
+		#save file
+		self.file = file
 
 		#init whitelist flag
 		# ->simply set to True if command is list of whitelisted commands
@@ -20,7 +23,6 @@ class Command():
 
 		return
 
-	#TODO: is this used?
 	#for json output
 	def __repr__(self):
 
@@ -30,4 +32,20 @@ class Command():
 	#for normal output
 	def prettyPrint(self):
 
-		return '%s\n' % (self.command)
+		#pretty-printed string
+		string = ''
+
+		#when cmd has file
+		if self.file:
+
+			#init
+			string = '\n%s\n file: %s\n' % (self.command, self.file)
+
+		#no file
+		else:
+
+			#init
+			string = '\n%s\n' % (self.command)
+
+
+		return string

@@ -1,0 +1,8 @@
+[Core]
+Name = Authorization Plugin Scanner
+Module = authorizationPlugin
+
+[Documentation]
+Author = Patrick W
+Version = 1.0
+Description = Plugin that scans for registered custom authorization plugins'
