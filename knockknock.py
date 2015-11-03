@@ -272,7 +272,7 @@ def initKK():
 	if not utils.isSupportedOS():
 
 		#dbg msg
-		utils.logMessage(utils.MODE_WARN, '%s is not an officially supported OS X version (your milage may vary)' % ('.'.join(utils.getOSVersion())))
+		utils.logMessage(utils.MODE_WARN, '%s is not an officially supported OS X version (your mileage may vary)' % ('.'.join(utils.getOSVersion())))
 
 	#dbg msg
 	else:
