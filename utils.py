@@ -52,6 +52,11 @@ kSecCSDefaultFlags = 0x0
 
 #from OS X
 kSecCSDoNotValidateResources = 0x4
+kSecCSCheckAllArchitectures = 0x1
+kSecCSCheckNestedCode = 0x8
+kSecCSStrictValidate = 0x16
+kSecCSStrictValidate_kSecCSCheckAllArchitectures = 0x17
+kSecCSStrictValidate_kSecCSCheckAllArchitectures_kSecCSCheckNestedCode = 0x1f
 
 #from OS X
 errSecSuccess = 0x0
@@ -420,7 +425,6 @@ def isKext(path):
 
 #check the signature of a file
 def checkSignature(file, bundle=None):
-
 	#global security framework 'handle'
 	global securityFramework
 
@@ -429,6 +433,8 @@ def checkSignature(file, bundle=None):
 
 	#return dictionary
 	signingInfo = {}
+
+	sigCheckFlags = kSecCSStrictValidate_kSecCSCheckAllArchitectures_kSecCSCheckNestedCode 
 
 	#status
 	#  ->just related to execution (e.g. API errors)
@@ -511,9 +517,9 @@ def checkSignature(file, bundle=None):
 		return (status, None)
 
 	#check signature
-	signedStatus = securityFramework.SecStaticCodeCheckValidityWithErrors(staticCode, kSecCSDoNotValidateResources,
-																		  None, None)
 
+	signedStatus = securityFramework.SecStaticCodeCheckValidityWithErrors(staticCode, sigCheckFlags,
+																		  None, None)
 	#make sure binary is signed
 	# ->then, determine if signed by apple & always extract signing authorities
 	if errSecSuccess == signedStatus:
@@ -542,8 +548,8 @@ def checkSignature(file, bundle=None):
 		if errSecSuccess == securityFramework.SecRequirementCreateWithString(ctypes.c_void_p(requirementsString), kSecCSDefaultFlags, ctypes.byref(requirement)):
 
 			#verify against requirement signature
-			if errSecSuccess == securityFramework.SecStaticCodeCheckValidity(staticCode, kSecCSDoNotValidateResources, requirement):
 
+			if errSecSuccess == securityFramework.SecStaticCodeCheckValidity(staticCode, sigCheckFlags, requirement):
 				#signed by apple
 				isApple = True
 
