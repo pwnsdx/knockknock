@@ -19,6 +19,12 @@ import utils
 #plugin framework import
 from yapsy.IPlugin import IPlugin
 
+#subprocess import
+from subprocess import check_output
+
+#regex import
+import re
+
 #directories for launch daemons
 LAUNCH_DAEMON_DIRECTORIES = ['/System/Library/LaunchDaemons/', '/Library/LaunchDaemons/']
 
@@ -40,6 +46,9 @@ LAUNCH_AGENT_DESCRIPTION = 'Interactive agents that are executed by Launchd'
 #(base) directory that has overrides for launch* and apps
 OVERRIDES_DIRECTORY = '/private/var/db/launchd.db/'
 
+#get system $PATH
+PATH = check_output(["/usr/libexec/path_helper"])
+PATH = re.search(r'PATH="(.*)"', PATH).group(1).split(':')
 
 #TODO: malware could abuse 'WatchPaths' 'StartOnMount' 'StartInterval', etc....
 #     for now, we just look for the basics ('RunAtLoad' and 'KeepAlive')
@@ -131,6 +140,15 @@ class scan(IPlugin):
 		#auto run binaries
 		autoRunBins = []
 
+		#function that check if the file is an alias and replace with the good path
+		def checkIfFileIsNotAnAlias(binary):
+			# get system $PATH
+			locations = PATH
+			for location in locations:
+				location = os.path.abspath(location + '/' + binary)
+				if os.path.isfile(location):
+					return location
+
 		#iterate over all plist
 		# ->check 'RunAtLoad' (for true) and then extract the first item in the 'ProgramArguments'
 		for plist in plists:
@@ -172,12 +190,13 @@ class scan(IPlugin):
 					# ->should be first item in args array
 					binary = programArguments[0]
 
-					#skip files that aren't found
-					# ->e.g firmwaresyncd
+					#if the file does not exist check if it's an alias
 					if not os.path.isfile(binary):
+						binary = checkIfFileIsNotAnAlias(binary)
 
-						#skip
-						continue
+						#if the file is still not found then we don't want it
+						if binary == None:
+							continue
 
 				#also check for 'Program' key
 				# ->e.g. /System/Library/LaunchAgents/com.apple.mrt.uiagent.plist
@@ -186,12 +205,13 @@ class scan(IPlugin):
 					#extract binary
 					binary = plistData['Program']
 
-					#skip files that aren't found
-					# ->e.g firmwaresyncd
+					#if the file does not exist check if it's an alias
 					if not os.path.isfile(plistData['Program']):
+						binary = checkIfFileIsNotAnAlias(binary)
 
-						#skip
-						continue
+						#if the file is still not found then we don't want it
+						if binary == None:
+							continue
 
 				#save extracted launch daemon/agent binary
 				if binary:

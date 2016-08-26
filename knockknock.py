@@ -89,8 +89,8 @@ def knocknock():
 					# ->depending on args, singed by apple, whitelisted, etc
 					if isinstance(startupObj, file.File):
 
-						#by default, ignore signed by Apple
-						if not args.apple and startupObj.signedByApple:
+						#by default, ignore signed by Apple in /System (protected by SIP)
+						if not args.apple and startupObj.signedByApple and startupObj.plist.startswith('/System'):
 
 							#add to list
 							ignoredItems.append(startupObj)
